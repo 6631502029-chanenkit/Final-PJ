@@ -1,0 +1,55 @@
+services:
+  php-apache-environment:
+    container_name: php-apache-v2
+    restart: unless-stopped
+    build: 
+      context: ./php
+      dockerfile: Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_NAME: ${MYSQL_DATABASE:-digital_authentication_system_das}
+      DB_USER: ${MYSQL_USER:-app_user}
+      DB_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD in .env}
+      OTP_WEBHOOK_URL: ${OTP_WEBHOOK_URL:-}
+      OTP_WEBHOOK_SECRET: ${OTP_WEBHOOK_SECRET:-}
+      OTP_DEBUG: ${OTP_DEBUG:-false}
+    volumes:
+      - ./php/src:/var/www/html/
+    ports:
+      - "127.0.0.1:8080:80"
+
+  db:
+    container_name: db-v2
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-digital_authentication_system_das}
+      MYSQL_USER: ${MYSQL_USER:-app_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD in .env}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    profiles: ["admin"]
+    ports:
+      - "127.0.0.1:8000:80"
+    restart: always
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+    depends_on:
+      db:
+        condition: service_healthy
+      
+volumes:
+  mysql_data:
